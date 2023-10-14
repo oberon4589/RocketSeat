@@ -24,34 +24,45 @@ public class FilterTaskAuth extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Pegar a autenticação (usuário e senha)
-        var authorization = request.getHeader("Authorization");
+        var serveletPath = request.getServletPath();
 
-        var authEncoded = authorization.substring("Basic".length()).trim(); // Remove o "Basic" do início da string
+        if (serveletPath.equals("/tasks/")) {
+            // Pegar a autenticação (usuário e senha)
+            var authorization = request.getHeader("Authorization");
 
-        byte[] authDecode = Base64.getDecoder().decode(authEncoded); // Decodifica a string
+            if (authorization != null) {
+                var authEncoded = authorization.substring("Basic".length()).trim(); // Remove o "Basic" do início da
+                                                                                    // string
 
-        var authString = new String(authDecode); // Transforma o array de bytes em string
+                byte[] authDecode = Base64.getDecoder().decode(authEncoded); // Decodifica a string
 
-        String[] credentials = authString.split(":"); // Divide a string em duas partes, separadas pelo ":"
-        String username = credentials[0];
-        String password = credentials[1];
+                var authString = new String(authDecode); // Transforma o array de bytes em string
 
-        // Verificar se o usuário e senha estão corretos
-        var user = this.userRepository.findByUsername(username);
-        if (user == null) {
-            response.sendError(401);
-        } else {
-            var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
-            if (passwordVerify.verified) {
-                filterChain.doFilter(request, response);
+                String[] credentials = authString.split(":"); // Divide a string em duas partes, separadas pelo ":"
+                String username = credentials[0];
+                String password = credentials[1];
+
+                // Verificar se o usuário e senha estão corretos
+                var user = this.userRepository.findByUsername(username);
+                if (user == null) {
+                    response.sendError(401);
+                } else {
+                    var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
+                    if (passwordVerify.verified) {
+                        request.setAttribute("idUser", user.getId());
+                        filterChain.doFilter(request, response);
+                    } else {
+                        response.sendError(401);
+                    }
+                }
+                // Se estiverem corretos, deixa a requisição passar
             } else {
+                // Lida com a situação em que "authorization" é null
                 response.sendError(401);
             }
+        } else {
+            filterChain.doFilter(request, response);
         }
-        // Se estiverem corretos, deixa a requisição passar
-
-        filterChain.doFilter(request, response);
     }
 
 }
